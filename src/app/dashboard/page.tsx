@@ -1,10 +1,21 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Accordion, Table, Title, Card, Loader, Text, Anchor, Button, Group, TextInput, SimpleGrid } from '@mantine/core';
+import { Accordion, Table, Title, Card, Loader, Text, Anchor, Button, Group, TextInput, SimpleGrid, Switch } from '@mantine/core';
 import type { PublicFile } from '../api/risks/public/route';
 import { signOut, useSession } from 'next-auth/react';
 import Link from 'next/link';
+
+function maskEmail(email: string): string {
+  const [localPart, domain] = email.split('@');
+  if (!domain) return '***';
+  const maskedLocal = localPart.charAt(0) + '***';
+  const domainParts = domain.split('.');
+  const maskedDomain = domainParts.map((part, idx) =>
+    idx === domainParts.length - 1 ? part : part.charAt(0) + '***'
+  ).join('.');
+  return `${maskedLocal}@${maskedDomain}`;
+}
 
 function StatisticsCard() {
   const [stats, setStats] = useState<{
@@ -75,7 +86,7 @@ function StatisticsCard() {
   );
 }
 
-function AllUsersCard() {
+function AllUsersCard({ maskEmails }: { maskEmails: boolean }) {
   const [users, setUsers] = useState<{email: string; type: string; fileCount: number}[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -146,7 +157,7 @@ function AllUsersCard() {
                 <tr key={i}>
                   <td>
                     <Anchor component="button" onClick={() => handleUserClick(user.email)}>
-                      {user.email}
+                      {maskEmails ? maskEmail(user.email) : user.email}
                     </Anchor>
                   </td>
                   <td>{user.type}</td>
@@ -158,7 +169,7 @@ function AllUsersCard() {
 
           {selectedUser && (
             <Card mt="md" withBorder>
-              <Title order={4}>Files accessible by {selectedUser}</Title>
+              <Title order={4}>Files accessible by {maskEmails ? maskEmail(selectedUser) : selectedUser}</Title>
               {filesLoading ? (
                 <Loader size="sm" mt="md" />
               ) : (
@@ -193,7 +204,7 @@ function AllUsersCard() {
   );
 }
 
-function BrokenInheritanceCard() {
+function BrokenInheritanceCard({ maskEmails }: { maskEmails: boolean }) {
   const [groupedFindings, setGroupedFindings] = useState<{[key: string]: any[]}>({});
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -257,7 +268,7 @@ function BrokenInheritanceCard() {
                       <tr key={i}>
                         <td><Anchor href={item.link} target="_blank" size="sm">{item.name}</Anchor></td>
                         <td>{item.parentName}</td>
-                        <td>{item.extraUser}</td>
+                        <td>{maskEmails ? maskEmail(item.extraUser) : item.extraUser}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -281,6 +292,7 @@ export default function DashboardPage() {
   const [isScanning, setIsScanning] = useState(false);
   const [scanResult, setScanResult] = useState<string | null>(null);
   const [folderName, setFolderName] = useState('');
+  const [maskEmails, setMaskEmails] = useState(false);
 
   const fetchRiskData = () => {
     setIsLoading(true);
@@ -331,9 +343,16 @@ export default function DashboardPage() {
     <main style={{ padding: '2rem', maxWidth: '800px', margin: 'auto' }}>
       <Group position="apart" mb="xl">
         <Title>Dashboard</Title>
-        <Button variant="outline" onClick={() => signOut({ callbackUrl: '/' })}>
-          Sign Out
-        </Button>
+        <Group>
+          <Switch
+            label="Mask emails"
+            checked={maskEmails}
+            onChange={(event) => setMaskEmails(event.currentTarget.checked)}
+          />
+          <Button variant="outline" onClick={() => signOut({ callbackUrl: '/' })}>
+            Sign Out
+          </Button>
+        </Group>
       </Group>
       
       <Card shadow="sm" padding="lg" radius="md" withBorder mb="xl">
@@ -369,8 +388,8 @@ export default function DashboardPage() {
       </Card>
 
       <StatisticsCard />
-      <BrokenInheritanceCard />
-      <AllUsersCard />
+      <BrokenInheritanceCard maskEmails={maskEmails} />
+      <AllUsersCard maskEmails={maskEmails} />
 
       <Card shadow="sm" padding="lg" radius="md" withBorder>
         <Title order={2} mb="md">Publicly Shared Files</Title>
@@ -393,7 +412,7 @@ export default function DashboardPage() {
               {files.map((file) => (
                 <tr key={file.id}>
                   <td>{file.name}</td>
-                  <td>{file.owner}</td>
+                  <td>{maskEmails ? maskEmail(file.owner) : file.owner}</td>
                   <td>
                     <Anchor href={file.webViewLink} target="_blank" rel="noopener noreferrer">
                       Open File
